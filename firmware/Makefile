@@ -1,0 +1,3 @@
+BOARD=promicro16
+BOARDSPATH=hardware/sf32u4_boards
+include arduino.mk
