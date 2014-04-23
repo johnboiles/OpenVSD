@@ -4,6 +4,7 @@
 #define DEBUG_LED_PIN 17
 #define MOTOR_CONTROL_PIN 3
 #define VCC 5.0f
+#define MOTOR_MINIMUM_PWM 50
 
 // TODO: Call the PID method in an OCR interrupt
 // TODO: Tune the pid
@@ -12,7 +13,7 @@
 
 void SerialReceive();
 void SerialSend();
-unsigned long serialTime; //this will help us know when to talk with processing
+unsigned long serialTime; // This will help us know when to talk with processing
 
 // Define Variables we'll be connecting to
 double Setpoint, Input, Output;
@@ -28,7 +29,29 @@ float readPressureSensor() {
     return pressure;
 }
 
+ISR(TIMER1_COMPA_vect) {
+    // (1 / 100s) * (16000000Hz / 256) = 625
+    OCR1A = TCNT1 + 625;
+    float pressure = readPressureSensor();
+    Input = pressure;
+    myPID.Compute();
+    uint8_t motorOutput = Output;
+    if (motorOutput <= MOTOR_MINIMUM_PWM) {
+        motorOutput = 0;
+    }
+    analogWrite(MOTOR_CONTROL_PIN, motorOutput);
+}
+
 void setup() {
+    // Disable interrupts
+    cli();
+
+    TCCR1A = 0;
+    TCCR1B = 1 << CS12; // Clock / 256 (31250Hz or .000032)
+    TCCR1C = 0; // not forcing output compare
+    TCNT1 = 0; // set timer counter initial value (16 bit value)
+    TIMSK1 = 1 << OCIE1A; // enable timer compare match 1A interrupt    
+
     Serial.begin(115200);
     pinMode(DEBUG_LED_PIN, OUTPUT);
     pinMode(PRESSURE_SENSOR_PIN, INPUT);
@@ -40,27 +63,20 @@ void setup() {
     Setpoint = 35;
 
     // Turn the PID on
-    myPID.SetOutputLimits(50, 255);
+    myPID.SetOutputLimits(MOTOR_MINIMUM_PWM, 255);
     myPID.SetMode(AUTOMATIC);
+    myPID.SetSampleTime(10);
+
+    // Enable interrupts
+    sei();
 }
 
 void loop() {
-	float pressure = readPressureSensor();
-
-    Input = pressure;
-    myPID.Compute();
-
-    uint8_t motorOutput = Output;
-    if (motorOutput == 50) {
-        motorOutput = 0;
-    }
-    analogWrite(MOTOR_CONTROL_PIN, motorOutput);
-
     // Send-receive with processing if it's time
     if (millis() > serialTime) {
         SerialReceive();
         SerialSend();
-        serialTime += 400;
+        serialTime += 300;
     }
 }
 
