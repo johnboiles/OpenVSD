@@ -3,8 +3,10 @@
 #define PRESSURE_SENSOR_PIN A0
 #define DEBUG_LED_PIN 17
 #define MOTOR_CONTROL_PIN 3
+#define INITIAL_SETPOINT_PSI 40
+
 #define VCC 5.0f
-#define MOTOR_MINIMUM_PWM 50
+#define MOTOR_MINIMUM_PWM 100
 
 // TODO: Call the PID method in an OCR interrupt
 // TODO: Tune the pid
@@ -19,7 +21,7 @@ unsigned long serialTime; // This will help us know when to talk with processing
 double Setpoint, Input, Output;
 
 // Specify the links and initial tuning parameters
-PID myPID(&Input, &Output, &Setpoint, 2, 1, 0, DIRECT);
+PID myPID(&Input, &Output, &Setpoint, 8, 6, 0, DIRECT);
 
 float readPressureSensor() {
     int analogValue = analogRead(PRESSURE_SENSOR_PIN);
@@ -36,7 +38,7 @@ ISR(TIMER1_COMPA_vect) {
     Input = pressure;
     myPID.Compute();
     uint8_t motorOutput = Output;
-    if (motorOutput <= MOTOR_MINIMUM_PWM) {
+    if (motorOutput <= MOTOR_MINIMUM_PWM || Input > 50.0) {
         motorOutput = 0;
     }
     analogWrite(MOTOR_CONTROL_PIN, motorOutput);
@@ -60,11 +62,13 @@ void setup() {
 
     // Initialize the variables we're linked to
     Input = readPressureSensor();
-    Setpoint = 35;
+    Setpoint = INITIAL_SETPOINT_PSI;
 
     // Turn the PID on
     myPID.SetOutputLimits(MOTOR_MINIMUM_PWM, 255);
+    // For now, require manual initiation
     myPID.SetMode(AUTOMATIC);
+    Output = 0;
     myPID.SetSampleTime(10);
 
     // Enable interrupts
@@ -76,10 +80,9 @@ void loop() {
     if (millis() > serialTime) {
         SerialReceive();
         SerialSend();
-        serialTime += 300;
+        serialTime += 350;
     }
 }
-
 
 /********************************************
  * Serial Communication functions / helpers

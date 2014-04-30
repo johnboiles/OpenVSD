@@ -17,3 +17,17 @@ Bill of Materials
 1x 1uF Capacitor
 
 1x 5V Sparkfun Arduino Pro Micro 
+
+TODO
+____
+Add flyback diode
+
+Better footprint for screw terminals
+
+Proper footprint for film capacitor
+
+Silkscreen to indicate orientation of Arduino
+
+Switch to default back to pressure switch
+
+Debug LEDs
